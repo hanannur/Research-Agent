@@ -36,6 +36,10 @@ class SourceRecord(BaseModel):
     publication_date: Optional[str] = Field(
         None, description="Publication date or recency indicator if available"
     )
+    source_type: str = Field(
+        default="General Web",
+        description="Source classification: Academic Paper / Preprint, Official Documentation, Engineering Blog / Technical Article, or General Web",
+    )
 
     @field_validator("url")
     @classmethod

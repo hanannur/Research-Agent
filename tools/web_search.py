@@ -1,9 +1,9 @@
 """
-Web Search Tool.
-Primary Provider: DuckDuckGo Search (no API key required).
-Fallback Provider: Open Web / Wikipedia REST API for when DuckDuckGo
-experiences rate limits, network timeouts, or ISP blocks.
-Provides robust URL normalization, deduplication, error handling, and timeout safeguards.
+Web Search Tool for DeepResearch AI.
+Primary Provider: DuckDuckGo Search (no paid API key required).
+Academic Provider: Official arXiv Atom API for verified preprints and papers.
+Fallback Provider: Open Web / Wikipedia REST API for resilient fallback.
+Provides robust URL normalization, deduplication, evidence categorization, and timeout safeguards.
 """
 
 import logging
@@ -11,6 +11,7 @@ import re
 import time
 from typing import Optional
 from urllib.parse import quote, urlparse, urlunparse
+import xml.etree.ElementTree as ET
 
 import httpx
 
@@ -32,6 +33,162 @@ except ImportError:
         from duckduckgo_search import DDGS
     except ImportError:
         DDGS = None
+
+
+def categorize_source(url: str, title: str = "") -> str:
+    """
+    Categorizes a web source into distinct evidence categories:
+    - Academic Paper / Preprint
+    - Official Documentation
+    - Engineering Blog / Technical Article
+    - General Web
+    """
+    if not url:
+        return "General Web"
+
+    url_lower = url.lower()
+    parsed = urlparse(url_lower)
+    domain = parsed.netloc
+
+    # 1. Academic Papers & Preprints
+    academic_domains = (
+        "arxiv.org",
+        "openreview.net",
+        "semanticscholar.org",
+        "doi.org",
+        "acm.org",
+        "ieee.org",
+        "nature.com",
+        "biorxiv.org",
+        "medrxiv.org",
+        "sciencedirect.com",
+        "springer.com",
+        "ssrn.com",
+        "researchgate.net",
+        "aclweb.org",
+        "neurips.cc",
+        "icml.cc",
+        "cvpr.thecvf.com",
+    )
+    if any(ad in domain for ad in academic_domains):
+        return "Academic Paper / Preprint"
+
+    # 2. Official Documentation & Specifications
+    doc_domains = (
+        "docs.",
+        ".readthedocs.io",
+        "github.com",
+        "python.org",
+        "pytorch.org",
+        "huggingface.co",
+        "developer.",
+        "modelcontextprotocol.io",
+        "langchain.com",
+        "pydantic.dev",
+        "kubernetes.io",
+        "fastapi.tiangolo.com",
+        "docker.com",
+        "w3.org",
+        "ietf.org",
+        "peps.python.org",
+        "cloud.google.com/docs",
+        "aws.amazon.com/documentation",
+        "learn.microsoft.com",
+        "platform.openai.com",
+        "docs.anthropic.com",
+    )
+    if any(dd in url_lower for dd in doc_domains):
+        return "Official Documentation"
+
+    # 3. Engineering Blogs & Technical Articles
+    blog_indicators = (
+        "medium.com",
+        "dev.to",
+        "substack.com",
+        "github.io",
+        "netflixtechblog.com",
+        "eng.uber.com",
+        "blog.",
+        "blogs.",
+        "/blog/",
+        "/engineering/",
+        "simonwillison.net",
+        "martinfowler.com",
+        "thegradient.pub",
+        "distill.pub",
+        "openai.com/index",
+        "anthropic.com/news",
+    )
+    if any(bi in url_lower for bi in blog_indicators):
+        return "Engineering Blog / Technical Article"
+
+    return "General Web"
+
+
+def search_arxiv(query: str, max_results: int = 3, timeout: float = 5.0) -> list[SourceRecord]:
+    """
+    Retrieves verified preprints from arXiv using the official public Atom API.
+    Zero paid API key required. Never fabricates records.
+
+    Args:
+        query: Search keywords
+        max_results: Max preprints to return
+        timeout: Timeout in seconds
+
+    Returns:
+        List of verified SourceRecord items classified as Academic Paper / Preprint.
+    """
+    if not query or not query.strip():
+        return []
+
+    # Clean query of noisy punctuation for arXiv search syntax
+    clean_q = re.sub(r"[^\w\s-]", " ", query).strip()
+    words = [w for w in clean_q.split() if len(w) > 2]
+    if not words:
+        return []
+    search_term = " AND ".join(words[:4])
+
+    results: list[SourceRecord] = []
+    url = f"http://export.arxiv.org/api/query?search_query=all:{quote(search_term)}&start=0&max_results={max_results}"
+
+    try:
+        headers = {"User-Agent": "DeepResearchAI/1.0 (Research Assistant; academic arXiv client)"}
+        with httpx.Client(timeout=timeout, headers=headers) as client:
+            resp = client.get(url)
+            if resp.status_code == 200:
+                root = ET.fromstring(resp.content)
+                ns = {"atom": "http://www.w3.org/2005/Atom"}
+                for entry in root.findall("atom:entry", ns):
+                    title_elem = entry.find("atom:title", ns)
+                    id_elem = entry.find("atom:id", ns)
+                    summary_elem = entry.find("atom:summary", ns)
+                    published_elem = entry.find("atom:published", ns)
+
+                    if title_elem is None or id_elem is None:
+                        continue
+
+                    title = " ".join((title_elem.text or "").split())
+                    paper_url = (id_elem.text or "").strip()
+                    if paper_url.startswith("http://"):
+                        paper_url = "https://" + paper_url[7:]
+                    summary = " ".join((summary_elem.text or "").split()) if summary_elem is not None else ""
+                    pub_date = published_elem.text[:10] if published_elem is not None and published_elem.text else None
+
+                    if title and paper_url:
+                        results.append(
+                            SourceRecord(
+                                title=title,
+                                url=paper_url,
+                                snippet=summary[:320] + ("..." if len(summary) > 320 else ""),
+                                relevant_query=f"{query} (arXiv)",
+                                publication_date=pub_date,
+                                source_type="Academic Paper / Preprint",
+                            )
+                        )
+    except Exception as exc:
+        logger.info("arXiv query failed gracefully for '%s': %s", query, exc)
+
+    return results
 
 
 def normalize_url(raw_url: str) -> str:
@@ -109,6 +266,7 @@ def fallback_web_search(query: str, max_results: int = 4) -> list[SourceRecord]:
                                 snippet=snippet,
                                 relevant_query=f"{cand} (Open Web)",
                                 publication_date=None,
+                                source_type=categorize_source(u, t),
                             )
                         )
     except Exception as exc:
@@ -135,7 +293,7 @@ def search_duckduckgo(
         ddgs_client: Optional injected DDGS instance (for mocking/testing)
 
     Returns:
-        List of structured SourceRecord instances.
+        List of structured SourceRecord instances with evidence categorization.
     """
     if not query or not query.strip():
         logger.warning("Empty search query passed to search_duckduckgo")
@@ -166,6 +324,7 @@ def search_duckduckgo(
                             snippet=snippet or "No snippet provided.",
                             relevant_query=clean_query,
                             publication_date=None,
+                            source_type=categorize_source(url, title),
                         )
                     )
         except Exception as exc:
@@ -185,9 +344,11 @@ def batch_search(
     max_total_sources: int = 15,
     ddgs_client: Optional[object] = None,
     delay_between_calls: float = 0.2,
+    include_academic: bool = True,
 ) -> tuple[list[SourceRecord], list[str]]:
     """
     Executes a batch of search queries with deduplication by normalized URL.
+    Optionally retrieves verified academic preprints via arXiv for technical/scientific queries.
 
     Args:
         queries: List of search queries
@@ -195,6 +356,7 @@ def batch_search(
         max_total_sources: Hard limit on total deduplicated sources
         ddgs_client: Optional injected DDGS instance for testing
         delay_between_calls: Pause between queries
+        include_academic: Whether to check public arXiv API for relevant preprints
 
     Returns:
         (deduplicated_sources, failed_queries)
@@ -203,6 +365,7 @@ def batch_search(
     seen_urls: set[str] = set()
     failed_queries: list[str] = []
 
+    # 1. Execute targeted queries
     for idx, query in enumerate(queries):
         if len(unique_sources) >= max_total_sources:
             break
@@ -232,5 +395,20 @@ def batch_search(
         except Exception as exc:
             logger.error("Error executing query '%s': %s", query, exc)
             failed_queries.append(query)
+
+    # 2. Complement with real academic preprints from arXiv if space permits and not mocked
+    if include_academic and ddgs_client is None and len(unique_sources) < max_total_sources and queries:
+        try:
+            primary_topic = queries[0]
+            arxiv_records = search_arxiv(primary_topic, max_results=2)
+            for arec in arxiv_records:
+                norm_url = normalize_url(arec.url)
+                if norm_url and norm_url not in seen_urls:
+                    seen_urls.add(norm_url)
+                    unique_sources.append(arec)
+                    if len(unique_sources) >= max_total_sources:
+                        break
+        except Exception as e:
+            logger.debug("Academic preprint enrichment skipped: %s", e)
 
     return unique_sources, failed_queries

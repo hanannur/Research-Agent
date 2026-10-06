@@ -114,8 +114,8 @@ class ResearchWorkflowService:
             # ==============================================================
             # STAGE 2: Web Research Execution (Agent 2)
             # ==============================================================
-            report_progress("Searching", f"Agent 2: Searching DuckDuckGo across {len(plan.search_queries)} queries...", 2)
-            logger.info("[%s] Stage 2: Web research with %d queries", sid, len(plan.search_queries))
+            report_progress("Searching", f"Agent 2: Discovering and verifying sources across {len(plan.search_queries)} queries...", 2)
+            logger.info("[%s] Stage 2: Web and preprint research with %d queries", sid, len(plan.search_queries))
 
             if custom_researcher_fn:
                 sources, failed_queries = custom_researcher_fn(plan, depth)

@@ -22,25 +22,25 @@ from models.schemas import (
 
 logger = logging.getLogger(__name__)
 
-WRITER_SYSTEM_PROMPT = """You are an elite Academic and Technical Research Writer in the DeepResearch AI system.
-Your mission is to produce a comprehensive, publication-grade Markdown research report.
+WRITER_SYSTEM_PROMPT = """You are the Lead Research Report Writer in the DeepResearch AI system, specialized in AI Systems & Software Engineering Research.
+Your mission is to produce an authoritative, publication-grade technical research report.
 
 REPORT STRUCTURE:
-1. Title
-2. Executive Summary
-3. Research Question & Objectives
-4. Methodology (explain multi-agent collaboration, DuckDuckGo web retrieval, and evidence filtering)
-5. Key Findings (synthesize findings with inline citations like [1], [2])
-6. Detailed Analysis (explore themes in depth, citing sources)
-7. Conflicting Evidence & Limitations (candid assessment of contradictions, bias, snippet limits)
-8. Conclusion (key takeaways, implications, and future outlook)
-9. Numbered References (ONLY cite real URLs from the provided source list)
+1. Title: Crisp, informative technical title reflecting the research question
+2. Executive Summary: High-density briefing detailing core findings, architectural takeaways, and key conclusions
+3. Research Question & Objectives: Precise problem framing, technical scope, and engineering context
+4. Methodology: Explanation of multi-agent pipeline, web & academic preprint retrieval (DuckDuckGo, arXiv, docs), source categorization, and reference auditing
+5. Key Findings: Synthesized empirical conclusions with inline citations like [1], [2]
+6. Detailed Analysis: Deep dive into architectural patterns, system trade-offs, benchmarks, and operational factors
+7. Conflicting Evidence & Limitations: Candid assessment of empirical contradictions, snippet limitations, benchmark variances, and information gaps
+8. Conclusion: Actionable takeaways for software engineers and AI practitioners, architectural recommendations, and future directions
+9. Numbered References: Strictly verified source citations linking directly to the real Source Registry
 
 CITATION INTEGRITY RULES:
 - Use numbered brackets like [1], [2] throughout the narrative.
-- Every citation MUST correspond to a source in the provided Source Registry.
-- DO NOT invent URLs or cite imaginary papers.
-- Do not make absolute factual claims that are unsupported by the sources.
+- Every citation MUST correspond to a genuine source in the provided Source Registry.
+- NEVER invent URLs, benchmark numbers, or non-existent papers.
+- Do not make unsupported factual assertions when sources only provide partial evidence.
 
 Output a validated ResearchReport model.
 """
@@ -132,7 +132,10 @@ def write_research_report(
     # Build numbered source registry text
     registry_lines = []
     for i, s in enumerate(sources, 1):
-        registry_lines.append(f"[{i}] Title: {s.title}\n    URL: {s.url}\n    Snippet: {s.snippet[:180]}...")
+        src_meta = f"Type: {s.source_type}"
+        if s.publication_date:
+            src_meta += f" | Date: {s.publication_date}"
+        registry_lines.append(f"[{i}] Title: {s.title}\n    URL: {s.url}\n    Metadata: {src_meta}\n    Snippet: {s.snippet[:200]}...")
     registry_text = "\n".join(registry_lines) if registry_lines else "No external sources retrieved."
 
     # Build analysis summary text
