@@ -14,16 +14,22 @@ from urllib.parse import quote, urlparse, urlunparse
 
 import httpx
 
-from models.schemas import SourceRecord
+try:
+    from models.schemas import SourceRecord
+except ImportError:
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from models.schemas import SourceRecord
 
 logger = logging.getLogger(__name__)
 
 # Try to import DDGS from ddgs or duckduckgo_search
 try:
-    from duckduckgo_search import DDGS
+    from ddgs import DDGS
 except ImportError:
     try:
-        from ddgs import DDGS
+        from duckduckgo_search import DDGS
     except ImportError:
         DDGS = None
 

@@ -3,6 +3,10 @@ DeepResearch AI — Multi-Agent Research Assistant
 Interactive Streamlit Dashboard.
 """
 
+from services.research_workflow import ResearchWorkflowService
+from models.schemas import ResearchSession
+from memory.repository import ResearchRepository
+from config import DEPTH_CONFIG, GEMINI_MODEL, validate_api_key
 import os
 import sys
 from datetime import datetime
@@ -12,10 +16,6 @@ import streamlit as st
 # Ensure repository root is on Python path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config import DEPTH_CONFIG, GEMINI_MODEL, validate_api_key
-from memory.repository import ResearchRepository
-from models.schemas import ResearchSession
-from services.research_workflow import ResearchWorkflowService
 
 # Page Configuration
 st.set_page_config(
@@ -166,7 +166,8 @@ with st.sidebar:
     )
 
     if search_keyword.strip():
-        past_sessions = service.repository.search_past_sessions(search_keyword.strip())
+        past_sessions = service.repository.search_past_sessions(
+            search_keyword.strip())
         st.caption(f"Found {len(past_sessions)} matching sessions:")
     else:
         past_sessions = service.repository.list_sessions(limit=25)
@@ -176,12 +177,15 @@ with st.sidebar:
     else:
         for sess in past_sessions:
             sid = sess["session_id"]
-            q_short = sess["question"][:42] + ("..." if len(sess["question"]) > 42 else "")
+            q_short = sess["question"][:42] + \
+                ("..." if len(sess["question"]) > 42 else "")
             dt_str = sess["created_at"][:10]
-            status_icon = "✅" if sess["status"] == "completed" else ("❌" if sess["status"] == "failed" else "⏳")
+            status_icon = "✅" if sess["status"] == "completed" else (
+                "❌" if sess["status"] == "failed" else "⏳")
 
             with st.expander(f"{status_icon} {q_short} ({dt_str})"):
-                st.caption(f"**ID**: `{sid[:8]}...` | **Depth**: {sess.get('depth', 'Standard')}")
+                st.caption(
+                    f"**ID**: `{sid[:8]}...` | **Depth**: {sess.get('depth', 'Standard')}")
                 st.caption(f"**Status**: `{sess['status']}`")
 
                 col_btn1, col_btn2 = st.columns(2)
@@ -224,7 +228,7 @@ with st.sidebar:
     st.markdown("### ⚙️ System Config")
     api_valid, api_msg = validate_api_key()
     if api_valid:
-        st.success(f"Gemini API: Connected\nModel: `{GEMINI_MODEL}`", icon="🟢")
+        st.success(print("sucess"))
     else:
         st.error(api_msg, icon="🔴")
         api_override = st.text_input("Enter Gemini API Key", type="password")
@@ -324,7 +328,8 @@ if start_btn:
             pct = int((step / total) * 100)
             progress_bar.progress(pct, text=f"Stage {step}/{total}: {msg}")
             status_box.write(f"**[{stage}]** {msg}")
-            st.session_state.stage_logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] [{stage}] {msg}")
+            st.session_state.stage_logs.append(
+                f"[{datetime.now().strftime('%H:%M:%S')}] [{stage}] {msg}")
 
         try:
             completed_session = service.run_research(
@@ -334,13 +339,15 @@ if start_btn:
             )
             st.session_state.current_session = completed_session
             st.session_state.is_running = False
-            status_box.update(label="Research Workflow Completed Successfully!", state="complete", expanded=False)
+            status_box.update(
+                label="Research Workflow Completed Successfully!", state="complete", expanded=False)
             st.toast("Research Report Ready!", icon="🎉")
             st.rerun()
 
         except Exception as exc:
             st.session_state.is_running = False
-            status_box.update(label=f"Workflow Failed: {exc}", state="error", expanded=True)
+            status_box.update(
+                label=f"Workflow Failed: {exc}", state="error", expanded=True)
             st.error(f"Error during research workflow: {exc}")
 
 
@@ -356,7 +363,8 @@ if active_session:
     h_col1, h_col2 = st.columns([3, 1])
     with h_col1:
         st.markdown(f"### 📋 Research: *{active_session.question}*")
-        st.caption(f"Session ID: `{active_session.session_id}` | Depth: `{active_session.depth}` | Status: `{active_session.status}`")
+        st.caption(
+            f"Session ID: `{active_session.session_id}` | Depth: `{active_session.depth}` | Status: `{active_session.status}`")
     with h_col2:
         if active_session.report and active_session.report.full_markdown:
             dl_col1, dl_col2 = st.columns(2)
@@ -401,7 +409,8 @@ if active_session:
         if not active_session.sources:
             st.info("No sources retrieved yet.")
         else:
-            st.caption(f"Retrieved and deduplicated {len(active_session.sources)} sources from DuckDuckGo.")
+            st.caption(
+                f"Retrieved and deduplicated {len(active_session.sources)} sources from DuckDuckGo.")
             for i, src in enumerate(active_session.sources, 1):
                 st.markdown(
                     f"""
