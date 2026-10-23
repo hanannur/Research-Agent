@@ -225,7 +225,7 @@ with st.sidebar:
                 st.rerun()
 
     st.markdown("---")
-    st.markdown("### ⚙️ System Config")
+    # st.markdown("### ⚙️ System Config")
     api_valid, api_msg = validate_api_key()
     if api_valid:
         st.success(print("sucess"))
@@ -238,7 +238,7 @@ with st.sidebar:
                 st.success("API Key updated in runtime environment!")
                 st.rerun()
 
-    st.caption("DuckDuckGo: Active (No API Key Required)")
+    # st.caption("DuckDuckGo: Active (No API Key Required)")
 
 
 # ==============================================================================
@@ -252,7 +252,7 @@ st.markdown(
         <div class="hero-title">DeepResearch AI</div>
         <p class="hero-subtitle">
             Autonomous multi-agent research assistant. Powered by <b>PydanticAI</b>, <b>Google Gemini</b>, 
-            <b>DuckDuckGo Live Search</b>, and <b>SQLite Persistent Memory</b>.
+            <b>DuckDuckGo: Active Live Search</b>, and <b>SQLite Persistent Memory</b>.
         </p>
     </div>
     """,
